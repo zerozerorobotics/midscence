@@ -1,0 +1,83 @@
+
+name: Shopify Daily Midscene Smoke Test
+
+on:
+  schedule:
+    # 每天北京时间 02:00（UTC 18:00）
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopify-daily-midscene
+  cancel-in-progress: false
+
+jobs:
+  smoke-test:
+    name: Production storefront smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      MIDSCENE_MODEL_API_KEY: ${{ secrets.MIDSCENE_MODEL_API_KEY }}
+      MIDSCENE_MODEL_NAME: ${{ vars.MIDSCENE_MODEL_NAME }}
+      MIDSCENE_MODEL_BASE_URL: ${{ vars.MIDSCENE_MODEL_BASE_URL }}
+      MIDSCENE_MODEL_FAMILY: ${{ vars.MIDSCENE_MODEL_FAMILY }}
+      FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.3.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        working-directory: tests/midscene
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        working-directory: tests/midscene
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Midscene tests
+        id: midscene
+        uses: web-infra-dev/midscene-action@v1
+        with:
+          working-directory: tests/midscene
+          command: pnpm test
+
+      - name: Notify Feishu on failure
+        if: ${{ failure() && env.FEISHU_WEBHOOK != '' }}
+        shell: bash
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          payload="$(jq -n \
+            --arg text "⚠️ Shopify 每日冒烟测试失败\n仓库：${GITHUB_REPOSITORY}\n分支：${GITHUB_REF_NAME}\n运行编号：${GITHUB_RUN_ID}\n查看日志：${RUN_URL}" \
+            '{msg_type:"text",content:{text:$text}}')"
+
+          response="$(curl --silent --show-error \
+            --max-time 15 \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            -w '\n%{http_code}' \
+            "$FEISHU_WEBHOOK")"
+
+          http_code="$(printf '%s\n' "$response" | tail -n 1)"
+          body="$(printf '%s\n' "$response" | sed '$d')"
+
+          if [[ "$http_code" != "200" ]] || \
+             [[ "$(printf '%s' "$body" | jq -r '.code // 0')" != "0" ]]; then
+            echo "Feishu notification failed: HTTP $http_code"
+            exit 1
+          fi
