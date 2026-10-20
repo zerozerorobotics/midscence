@@ -40,18 +40,15 @@ jobs:
           node-version: "24"
 
       - name: Install dependencies
-        working-directory: tests/midscene
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        working-directory: tests/midscene
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run Midscene tests
         id: midscene
         uses: web-infra-dev/midscene-action@v1
         with:
-          working-directory: tests/midscene
           command: pnpm test
 
       - name: Notify Feishu on failure
