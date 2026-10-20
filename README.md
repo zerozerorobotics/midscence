@@ -18,3 +18,4 @@ After changing Node registrations in `midscene.config.ts`, run `npm run nodes` t
 
 Tests run serially and stop after the first failed case (`test.bail: 1`). Reports are saved and the browser is closed on failure. Reports are written to `midscene_run/report/`.
 # midscence
+# midscence
