@@ -29,7 +29,14 @@ const setup = defineProjectSetup<ProjectContext>({
     });
     onTeardown(() => browser.close());
     const page = await browser.newPage();
-    const context: ProjectContext = { page };
+    const agent = new PlaywrightAgent(page);
+    await page
+      .waitForFunction(
+        () => !!document.getElementById('midscene-force-select-rendering'),
+        { timeout: 5_000 },
+      )
+      .catch(() => undefined);
+    const context: ProjectContext = { page, agent };
     onTeardown(async () => {
       await context.agent?.destroy();
     });

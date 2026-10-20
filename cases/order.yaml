@@ -1,34 +1,59 @@
-name: Midscene E2E Tests
-
-on:
-  push:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  test:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      MIDSCENE_MODEL_API_KEY: ${{ secrets.MIDSCENE_MODEL_API_KEY }}
-      MIDSCENE_MODEL_NAME: ${{ vars.MIDSCENE_MODEL_NAME }}
-      MIDSCENE_MODEL_FAMILY: ${{ vars.MIDSCENE_MODEL_FAMILY }}
-      MIDSCENE_MODEL_BASE_URL: ${{ vars.MIDSCENE_MODEL_BASE_URL }}
+cases:
+  - name: 首页可正常打开
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-      - name: Install dependencies and browser
-        working-directory: tests/midscene
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-      - name: Run Midscene tests
-        id: midscene
-        uses: web-infra-dev/midscene-action@v1
-        with:
-          working-directory: tests/midscene
-          command: npm test
+      - gotoUrl: https://us.hoverair.com
+      - aiWaitFor: 首页主内容已经显示，不再是空白页或长时间停留的加载状态。
+      - aiAssert:
+          prompt: |
+            当前是 HOVERAir 美国站首页。
+            页面有品牌标识和主导航，主区域能看到产品或活动内容。
+            不是 404、访问拒绝、地区不可用或服务器错误页。
+          message: Shopify 首页未能正常展示
+
+  - name: 商品详情页可购买
+    steps:
+      - gotoUrl: https://us.hoverair.com/products/hoverair-x1-pro-promax
+      - aiWaitFor: 商品标题或页面弹窗已经显示。
+      - aiAct: |
+          关掉挡住商品页的浮层，不要填写邮箱，不要订阅，不要离开当前商品详情页。
+          如果页面中央有万圣节订阅领优惠券弹窗，点击它的关闭按钮或 No thanks。
+          如果底部有 Cookie 隐私提示条，点击 Accept、Agree、同意或关闭，让提示条消失。
+      - aiAct: |
+          在购买区域选择任意一个当前可购买的型号或版本。
+          如果有附件列表，勾选第一个附件。
+          不要点击 Add to cart、Buy it now、Checkout 或结账。
+      - aiAssert:
+          prompt: |
+            当前是 HOVERAir X1 PRO & PROMAX 的商品详情页。
+            订阅弹窗和 Cookie 提示条没有挡住购买区域。
+            能看到商品标题、商品图片、价格、型号或规格选择，以及 Add to cart 或加入购物车按钮。
+            页面不是缺货占位、404 或错误页。
+          message: 商品详情页未能正常展示
+
+  - name: 加购后购物车包含该商品
+    steps:
+      - gotoUrl: https://us.hoverair.com/products/hoverair-x1-pro-promax
+      - aiWaitFor: 商品购买区域已经显示。
+      - aiAct: |
+          如果 Cookie、地区或订阅弹窗挡住了购买区域，先关闭它。
+          如果必须先选型号，选择一个当前可购买的选项；能看到 X1 PROMAX | Standard 时就选它。
+          只点击 Add to cart 或加入购物车。
+          如果弹出弹框，选择Add to Cart
+          如果页面跳换到购物车页面，等待页面加载完成。
+      - aiWaitFor: 购物车页面已经显示商品列表或空购物车状态，而不是跳转中的空白页。
+      - aiAssert:
+          prompt: |
+            当前是购物车页面。
+            购物车中有 HOVERAir X1 PRO & PROMAX，数量至少为 1，并显示价格。
+            页面没有报错、售罄或不可用提示。
+          message: 加购或购物车检查失败
+      - aiAct: |
+          只点击 Checkout 或结账。
+          如果页面跳换到结账页面，等待页面加载完成。
+      - aiWaitFor: 结账页面已经显示，不再是空白页或长时间停留的加载状态。
+      - aiAssert:
+          prompt: |
+            当前是结账页面。
+            结账页面有订单摘要、支付方式、收货地址等信息。
+            页面没有报错、售罄或不可用提示。
+          message: 结账页面未能正常展示
