@@ -50,6 +50,7 @@ jobs:
         uses: web-infra-dev/midscene-action@v1
         with:
           command: pnpm test
+          working-directory: .
 
       - name: Notify Feishu on failure
         if: ${{ failure() && env.FEISHU_WEBHOOK != '' }}
