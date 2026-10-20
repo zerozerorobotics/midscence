@@ -52,14 +52,21 @@ jobs:
           command: pnpm test
           working-directory: .
 
-      - name: Notify Feishu on failure
-        if: ${{ failure() && env.FEISHU_WEBHOOK != '' }}
+      - name: Notify Feishu
+        if: ${{ (success() || failure()) && env.FEISHU_WEBHOOK != '' }}
         shell: bash
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEST_OUTCOME: ${{ steps.midscene.outcome }}
         run: |
+          if [[ "$TEST_OUTCOME" == "success" ]]; then
+            title="✅ Shopify 每日下单测试通过"
+          else
+            title="⚠️ Shopify 每日下单测试失败"
+          fi
+
           payload="$(jq -n \
-            --arg text "⚠️ Shopify 每日冒烟测试失败\n仓库：${GITHUB_REPOSITORY}\n分支：${GITHUB_REF_NAME}\n运行编号：${GITHUB_RUN_ID}\n查看日志：${RUN_URL}" \
+            --arg text "${title}\n仓库：${GITHUB_REPOSITORY}\n分支：${GITHUB_REF_NAME}\n运行编号：${GITHUB_RUN_ID}\n查看日志：${RUN_URL}" \
             '{msg_type:"text",content:{text:$text}}')"
 
           response="$(curl --silent --show-error \
