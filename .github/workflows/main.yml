@@ -62,9 +62,9 @@ jobs:
           TEST_OUTCOME: ${{ steps.midscene.outcome }}
         run: |
           if [[ "$TEST_OUTCOME" == "success" ]]; then
-            title="✅ Shopify 每日下单测试通过"
+            title="✅ Shopify US每日下单测试通过"
           else
-            title="⚠️ Shopify 每日下单测试失败"
+            title="⚠️ Shopify US每日下单测试失败"
           fi
 
           payload="$(jq -n \
